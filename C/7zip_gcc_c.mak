@@ -14,7 +14,7 @@ PROGPATH = $(O)/$(PROG)
 PROGPATH_STATIC = $(O)/$(PROG)s
 
 ifneq ($(CC), xlc)
-CFLAGS_WARN_WALL = -Wall -Werror -Wextra
+CFLAGS_WARN_WALL = -Wall -Werror -Wextra -Wno-array-bounds
 endif
 
 # for object file
