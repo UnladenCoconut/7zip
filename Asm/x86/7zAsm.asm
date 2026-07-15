@@ -33,6 +33,14 @@ else
   IS_LINUX equ 0
 endif
 
+; MacOS uses linux ABI but still prefixes symbol names with underscore
+ifdef ABI_MACOS
+  IS_MACOS equ 1
+else 
+  IS_MACOS equ 0
+endif
+
+
 ifndef x64
 ; Use ABI_CDECL for x86 (32-bit) only
 ; if ABI_CDECL is not defined, we use fastcall abi
@@ -59,7 +67,9 @@ endm
 MY_PROC macro name:req, numParams:req
   align 16
   proc_numParams = numParams
-  if (IS_X64 gt 0)
+  if (IS_MACOS gt 0)
+    proc_name equ @CatStr(_,name)
+  elseif (IS_X64 gt 0)
     proc_name equ name
   elseif (IS_LINUX gt 0)
     proc_name equ name

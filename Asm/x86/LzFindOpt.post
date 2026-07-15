@@ -1,0 +1,299 @@
+  x64 equ 1
+  IS_X64 equ 1
+  IS_LINUX equ 0
+  IS_MACOS equ 1
+OPTION PROLOGUE:NONE
+OPTION EPILOGUE:NONE
+  REG_SIZE equ 8
+  REG_LOGAR_SIZE equ 3
+    .code
+  Z7_LZ_FIND_OPT_ASM_USE_SEGMENT equ 0
+    cutValue_OFFS       equ  (REG_SIZE * (8 + 1 + 4))
+    d_OFFS              equ  (REG_SIZE + cutValue_OFFS)
+    maxLen_OFFS         equ  (REG_SIZE + d_OFFS)
+    hash_OFFS           equ  (REG_SIZE + maxLen_OFFS)
+    limit_OFFS          equ  (REG_SIZE + hash_OFFS)
+    size_OFFS           equ  (REG_SIZE + limit_OFFS)
+    cycPos_OFFS         equ  (REG_SIZE + size_OFFS)
+    cycSize_OFFS        equ  (REG_SIZE + cycPos_OFFS)
+    posRes_OFFS         equ  (REG_SIZE + cycSize_OFFS)
+    LOCAL_SIZE          equ  8 * 8
+  align 16
+  proc_numParams = 13
+  _GetMatchesSpecN_2 PROC
+    push    RBX
+    push    RBP
+    push    RSI
+    push    RDI
+        push    r12
+        push    r13
+        push    r14
+        push    r15
+        mov     RAX, RSP
+        lea     RBX, [RAX - LOCAL_SIZE]
+        and     RBX, -64
+        mov     RSP, RBX
+        mov     QWORD PTR [RSP + 8 * 7], RAX
+        mov     EBX, [RAX + cutValue_OFFS]
+        mov     DWORD PTR [RSP + 8 * 0], EBX
+        mov     r13, [RAX + d_OFFS]
+        mov     RBX, [RAX + limit_OFFS]
+        mov     QWORD PTR [RSP + 8 * 3], RBX
+        mov     r10, [RAX + size_OFFS]
+        mov     QWORD PTR [RSP + 8 * 4], r10
+        mov     EBX, [RAX + cycPos_OFFS]
+        mov     r14, [RAX + hash_OFFS]
+        mov     ESI, [RAX + cycSize_OFFS]
+        mov     DWORD PTR [RSP + 8 * 1 + 4], ESI
+        sub     r8, RCX
+        neg     r8d
+        inc     r8d
+        mov     EAX, [RAX + maxLen_OFFS]
+        sub     RAX, r8
+        mov     QWORD PTR [RSP + 8 * 6], RAX
+        jmp     main_loop
+        align  16
+fill_empty:
+        mov     QWORD PTR [r15], 0
+        inc     EDX
+        inc     EBX
+        mov     DWORD PTR [r13 - 4], 0
+        cmp     r13, QWORD PTR [RSP + 8 * 3]
+        jae     fin
+        cmp     r14, r10
+        je      fin
+main_loop:
+        mov     EDI, [r14]
+        add     r14, 4
+        inc     RCX
+        add     r13, 4
+        mov     EBP, EDX
+        sub     EBP, EDI
+        lea     r15, [r9 + 8 * RBX]
+        cmp     EDX, ESI
+        jb      directMode
+        cmp     EDI, ESI
+        jae     fill_empty
+        xor     EAX, EAX
+        mov     DWORD PTR [RSP + 8 * 1 + 0], EBX
+        sub     EBX, EDI
+        cmovb   EAX, ESI
+        add     EBX, EAX
+        jmp     prepare_for_tree_loop
+directMode:
+        cmp     EDI,  EDX
+        je      fill_empty
+        jae     fin_error
+        mov     DWORD PTR [RSP + 8 * 1 + 0], EBX
+        mov     EBX, EBP
+prepare_for_tree_loop:
+        mov     r10, r8
+        mov     QWORD PTR [RSP + 8 * 2], r14
+        lea     r14, [r15 + 4]
+        mov     QWORD PTR [RSP + 8 * 5], r13
+        neg     r10
+        mov     r11, r10
+        mov     EAX, DWORD PTR [RSP + 8 * 0]
+        mov     r12, QWORD PTR [RSP + 8 * 6]
+        mov     DWORD PTR [RSP + 8 * 0 + 4], EAX
+        align  16
+tree_loop:
+        neg     RDI
+        mov     RSI, r10
+        cmp     r11, r10
+        cmovb   RSI, r11
+        add     RDI, RCX
+        mov     EAX, [r9 + RBX * 8]
+        movzx   EAX, BYTE PTR [RDI + 1 * RSI]
+        lea     RBX, [r9 + RBX * 8]
+        cmp     [RCX + 1 * RSI], AL
+        je      matched_1
+        jb      left_0
+        mov     [r15], EBP
+        mov        EBP, [RBX + 4]
+        lea     r15, [RBX + 4]
+        sub     RDI, RCX
+        jmp     next_node
+        align  16
+left_0:
+        mov     [r14], EBP
+        mov        EBP, [RBX]
+        mov     r14, RBX
+        sub     RDI, RCX
+next_node:
+        mov     ESI, DWORD PTR [RSP + 8 * 1 + 4]
+        dec     DWORD PTR [RSP + 8 * 0 + 4]
+        je      finish_tree
+        add     EDI, EDX
+        cmp     EBP, EDI
+        jae     fin_error
+        mov     EDI, EDX
+        sub     EDI, EBP
+        cmp     EDX, ESI
+        jae     cyc_mode_2
+        mov     EBX, EBP
+        test    EBP, EBP
+        jne     tree_loop
+finish_tree:
+        mov     DWORD PTR [r14], 0
+        mov     DWORD PTR [r15], 0
+        inc     EDX
+        mov     RAX, QWORD PTR [RSP + 8 * 5]
+        mov     RBX, r13
+        sub     RBX, RAX
+        shr     EBX, 2
+        mov     [RAX - 4], EBX
+        cmp     r13, QWORD PTR [RSP + 8 * 3]
+        jae     fin
+        mov     EBX, DWORD PTR [RSP + 8 * 1 + 0]
+        mov     r14, QWORD PTR [RSP + 8 * 2]
+        mov     r10, QWORD PTR [RSP + 8 * 4]
+        inc     EBX
+        cmp     r14, r10
+        jne     main_loop
+        jmp     fin
+        align  16
+cyc_mode_2:
+        cmp     EDI, ESI
+        jae     finish_tree
+        mov     EBX, DWORD PTR [RSP + 8 * 1 + 0]
+        xor     EAX, EAX
+        sub     EBX, EDI
+        cmovb   EAX, ESI
+        add     EBX, EAX
+        jmp     tree_loop
+        align  16
+matched_1:
+        inc     RSI
+        je      short lenLimit_reach
+        movzx   EAX, BYTE PTR [RDI + 1 * RSI]
+        cmp     [RCX + 1 * RSI], AL
+        jne     mismatch
+        align  16
+match_loop:
+        inc     RSI
+        je      short lenLimit_reach
+        movzx   EAX, BYTE PTR [RDI + 1 * RSI]
+        cmp     BYTE PTR [RCX + 1 * RSI], AL
+        je      match_loop
+mismatch:
+        jb      left_2
+        mov     [r15], EBP
+        mov        EBP, [RBX + 4]
+        lea     r15, [RBX + 4]
+        mov     r11, RSI
+        jmp     max_update
+        align  16
+left_2:
+        mov     [r14], EBP
+        mov        EBP, [RBX]
+        mov     r14, RBX
+        mov     r10, RSI
+max_update:
+        sub     RDI, RCX
+        cmp     r12, RSI
+        jae     next_node
+        mov     r12, RSI
+        add     RSI, r8
+        mov     [r13], ESI
+        mov     EAX, EDI
+        not     EAX
+        mov     [r13 + 4], EAX
+        add     r13, 8
+        jmp     next_node
+        align  16
+lenLimit_reach:
+        mov     r12, RCX
+        sub     r12, RDI
+        lea     r11, [r12 - 1]
+        mov     EAX, [RBX]
+        mov     [r15], EAX
+        mov     EAX, [RBX + 4]
+        mov     [r14], EAX
+        mov     [r13], r8d
+        mov     [r13 + 4], r11d
+        add     r13, 8
+        mov     RAX, QWORD PTR [RSP + 8 * 5]
+        mov     RBX, r13
+        sub     RBX, RAX
+        shr     EBX, 2
+        mov     [RAX - 4], EBX
+        mov     r14, QWORD PTR [RSP + 8 * 2]
+        mov     r10, QWORD PTR [RSP + 8 * 4]
+        inc     EDX
+        mov     EBX, DWORD PTR [RSP + 8 * 1 + 0]
+        inc     EBX
+        mov     RBP, QWORD PTR [RSP + 8 * 3]
+        mov     ESI, DWORD PTR [RSP + 8 * 1 + 4]
+        cmp     r14, r10
+        je      fin
+        cmp     r13, RBP
+        jae     fin
+        cmp     r12d, [r14]
+        jne     main_loop
+        movzx   EAX, BYTE PTR [RDI]
+        cmp     [RCX], AL
+        jne     main_loop
+        mov     DWORD PTR [RSP + 8 * 1 + 0], EBX
+        shl     RSI, 3
+        sub     RDI, RCX
+        xor     EAX, EAX
+        cmp     EBX, r12d
+        lea     RBX, [r9 + 8 * RBX]
+        lea     r15, [RBX + 8 * RDI]
+        cmovb   RAX, RSI
+        add     r15, RAX
+        add     RSI, r9
+        align  16
+long_loop:
+        add     r14, 4
+        mov     RAX, [r15]
+        add     r15, 8
+        mov     [RBX], RAX
+        add     RBX, 8
+        cmp     r15, RSI
+        cmove   r15, r9
+        mov     DWORD PTR [r13], 2
+        mov     [r13 + 4], r8d
+        mov     [r13 + 8], r11d
+        add     r13, 12
+        inc     RCX
+        cmp     r14, r10
+        je      long_footer
+        cmp     r12d, [r14]
+        jne     long_footer
+        movzx   EAX, BYTE PTR [RDI + 1 * RCX]
+        cmp     [RCX], AL
+        jne     long_footer
+        cmp     r13, RBP
+        jb      long_loop
+long_footer:
+        sub     RBX, r9
+        shr     RBX, 3
+        add     EDX, EBX
+        sub     EDX, DWORD PTR [RSP + 8 * 1 + 0]
+        mov     ESI, DWORD PTR [RSP + 8 * 1 + 4]
+        cmp     r13, RBP
+        jae     fin
+        cmp     r14, r10
+        jne     main_loop
+        jmp     fin
+fin_error:
+        xor     r13, r13
+fin:
+        mov     RSP, QWORD PTR [RSP + 8 * 7]
+        mov     RAX, [RSP + posRes_OFFS]
+        mov     [RAX], EDX
+        mov     RAX, r13
+        pop     r15
+        pop     r14
+        pop     r13
+        pop     r12
+    pop     RDI
+    pop     RSI
+    pop     RBP
+    pop     RBX
+        ret
+  _GetMatchesSpecN_2 ENDP
+_TEXT$LZFINDOPT ENDS
+end
